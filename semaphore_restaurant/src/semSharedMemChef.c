@@ -125,6 +125,11 @@ int main (int argc, char *argv[])
  */
 static void waitForOrder ()
 {
+    if (semDown (semgid, sh->mutex) == -1) {                                                          /* enter critical region */
+        perror ("error on the down operation for semaphore access (CH)");
+        exit (EXIT_FAILURE);
+    }
+
     if (semDown (semgid, sh->waitOrder) == -1) {                                                     /* enter critical region */
         perror ("error on the down operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
@@ -149,9 +154,6 @@ static void waitForOrder ()
         perror ("error on the up operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
-
-    // Save the internal state
-    saveState(nFic, &sh->fSt);
 }
 
 /**
@@ -187,7 +189,4 @@ static void processOrder ()
         perror ("error on the up operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
-
-    // Save the internal state
-    saveState(nFic, &sh->fSt);
 }
