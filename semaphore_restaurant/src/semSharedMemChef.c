@@ -7,7 +7,7 @@
  *  Implementation with SVIPC.
  *
  *  Definition of the operations carried out by the chef:
- *     \li waitOrder
+ *     \li waitForOrder
  *     \li processOrder
  *
  *  \author Nuno Lau - December 2023
@@ -67,7 +67,7 @@ int main (int argc, char *argv[])
         fprintf (stderr, "Number of parameters is incorrect!\n");
         return EXIT_FAILURE;
     }
-    else {
+    else { 
        freopen (argv[3], "w", stderr);
        setbuf(stderr,NULL);
     }
@@ -125,23 +125,23 @@ int main (int argc, char *argv[])
  */
 static void waitForOrder ()
 {
-
-    //TODO insert your code here
-     
-    if (semDown (semgid, sh->mutex) == -1) {                                                      /* enter critical region */
-        perror ("error on the up operation for semaphore access (PT)");
+    if (semDown (semgid, sh->waitOrder) == -1) {                                                     /* enter critical region */
+        perror ("error on the down operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
 
-    //TODO insert your code here
-    
+    // Update the chef's state
+    sh->fSt.st.chefStat = WAIT_FOR_ORDER;
+    saveState(nFic, &sh->fSt);
 
-    if (semUp (semgid, sh->mutex) == -1) {                                                      /* exit critical region */
-        perror ("error on the up operation for semaphore access (PT)");
+    // Acknowledge the order
+    if (semUp (semgid, sh->orderReceived) == -1) {                                                     /* exit critical region */
+        perror ("error on the up operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
 
-    //TODO insert your code here
+    // Save the internal state
+    saveState(nFic, &sh->fSt);
 }
 
 /**
@@ -154,22 +154,24 @@ static void waitForOrder ()
  */
 static void processOrder ()
 {
-    usleep((unsigned int) floor ((MAXCOOK * random ()) / RAND_MAX + 100.0));
+    usleep ((unsigned int) floor ((MAXCOOK * random ()) / RAND_MAX + 100.0));
 
-    //TODO insert your code here
-
-    if (semDown (semgid, sh->mutex) == -1) {                                                      /* enter critical region */
-        perror ("error on the up operation for semaphore access (PT)");
+    // Signal that the food is ready
+    if (semUp (semgid, sh->waiterRequest) == -1) {
+        perror ("error on the up operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
 
-    //TODO insert your code here
+    // Update the chef's state
+    sh->fSt.st.chefStat = COOK;
+    saveState(nFic, &sh->fSt);
 
-    if (semUp (semgid, sh->mutex) == -1) {                                                      /* exit critical region */
-        perror ("error on the up operation for semaphore access (PT)");
+    // Exit critical region
+    if (semUp (semgid, sh->mutex) == -1) {
+        perror ("error on the up operation for semaphore access (CH)");
         exit (EXIT_FAILURE);
     }
 
-    //TODO insert your code here
+    // Save the internal state
+    saveState(nFic, &sh->fSt);
 }
-

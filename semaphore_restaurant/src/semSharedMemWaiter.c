@@ -51,9 +51,6 @@ static void informChef(int group);
 /** \brief waiter takes food to table */
 static void takeFoodToTable (int group);
 
-
-
-
 /**
  *  \brief Main program.
  *
@@ -101,17 +98,17 @@ int main (int argc, char *argv[])
     srandom ((unsigned int) getpid ());              
 
     /* simulation of the life cycle of the waiter */
-    int nReq=0;
+    int nReq = 0;
     request req;
-    while( nReq < sh->fSt.nGroups*2 ) {
+    while (nReq < sh->fSt.nGroups * 2) {
         req = waitForClientOrChef();
-        switch(req.reqType) {
+        switch (req.reqType) {
             case FOODREQ:
-                   informChef(req.reqGroup);
-                   break;
+                informChef(req.reqGroup);
+                break;
             case FOODREADY:
-                   takeFoodToTable(req.reqGroup);
-                   break;
+                takeFoodToTable(req.reqGroup);
+                break;
         }
         nReq++;
     }
@@ -119,7 +116,7 @@ int main (int argc, char *argv[])
     /* unmapping the shared region off the process address space */
     if (shmemDettach (sh) == -1) {
         perror ("error on unmapping the shared region off the process address space");
-        return EXIT_FAILURE;;
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
@@ -136,37 +133,37 @@ int main (int argc, char *argv[])
  */
 static request waitForClientOrChef()
 {
-    request req; 
-    if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
-        perror ("error on the up operation for semaphore access (WT)");
+    request req;
+
+    // Wait for a request from either a group or the chef 
+    if (semDown (semgid, sh->waiterRequestPossible) == -1)  {                                   /* enter critical region */
+        perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    // TODO insert your code here
+    // Update the waiter's state
+    sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;
+    saveState(nFic, &sh->fSt);
     
-    if (semUp (semgid, sh->mutex) == -1)      {                                             /* exit critical region */
+    // Wait for a request to be made
+    if (semDown (semgid, sh->waiterRequest) == -1)      {                                       /* enter critical region */
         perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    // TODO insert your code here
+    // Read the request from shared memory
+    req = sh->fSt.waiterRequest;
 
-    if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
+    // Signal that new requests are possible
+    if (semUp (semgid, sh->waiterRequestPossible) == -1) {
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    // TODO insert your code here
-
-    if (semUp (semgid, sh->mutex) == -1) {                                                  /* exit critical region */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    // TODO insert your code here
+    // Save the internal state
+    saveState(nFic, &sh->fSt);
 
     return req;
-
 }
 
 /**
@@ -178,23 +175,36 @@ static request waitForClientOrChef()
  *  The internal state should be saved.
  *
  */
-static void informChef (int n)
+static void informChef(int n)
 {
-    if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
+    // Update the waiter's state
+    sh->fSt.st.waiterStat = INFORM_CHEF;
+    saveState(nFic, &sh->fSt);
+
+    // Inform the chef about the food request
+    sh->fSt.waiterRequest.reqType = FOODREQ;
+    sh->fSt.waiterRequest.reqGroup = n;
+
+    // Signal that a request has been made to the chef
+    if (semUp (semgid, sh->waiterRequest) == -1) {
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    // TODO insert your code here
-    
-    if (semUp (semgid, sh->mutex) == -1)                                                   /* exit critical region */
-    { perror ("error on the down operation for semaphore access (WT)");
+    // Wait for the chef to acknowledge the request
+    if (semDown (semgid, sh->orderReceived) == -1) {
+        perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    
-    // TODO insert your code here
+    // Signal that new requests are possible
+    if (semUp (semgid, sh->waiterRequestPossible) == -1) {
+        perror ("error on the up operation for semaphore access (WT)");
+        exit (EXIT_FAILURE);
+    }
 
+    // Save the internal state
+    saveState(nFic, &sh->fSt);
 }
 
 /**
@@ -205,19 +215,28 @@ static void informChef (int n)
  *  The internal state should be saved.
  *
  */
-
-static void takeFoodToTable (int n)
+static void takeFoodToTable(int n)
 {
-    if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
+    // Update the waiter's state
+    sh->fSt.st.waiterStat = TAKE_TO_TABLE;
+    saveState(nFic, &sh->fSt);
+
+    // Inform the group that the food is ready
+    sh->fSt.waiterRequest.reqType = FOODREADY;
+    sh->fSt.waiterRequest.reqGroup = n;
+
+    // Signal that the food is ready
+    if (semUp (semgid, sh->mutex) == -1) {
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
-    // TODO insert your code here
-    
-    if (semUp (semgid, sh->mutex) == -1)  {                                                  /* exit critical region */
-        perror ("error on the down operation for semaphore access (WT)");
+    // Signal that new requests are possible
+    if (semUp (semgid, sh->waiterRequestPossible) == -1) {
+        perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
-}
 
+    // Save the internal state
+    saveState(nFic, &sh->fSt);
+}
