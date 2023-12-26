@@ -285,6 +285,10 @@ static void provideTableOrWaitingRoom (int n)
         // mesa disponível, atribuir mesa ao grupo
         tableStatus[tableId] = 1;      // Mmrcar a mesa como ocupada
         groupRecord[n] = ATTABLE;      // atualizar o estado do grupo para ATTABLE
+
+        // Atualizar e salvar o estado
+        sh->fSt.st.receptionistStat = ASSIGNTABLE;
+        saveState(nFic, &sh->fSt);
     } else {
         // nenhuma mesa disponível, o grupo deve esperar
         groupRecord[n] = WAIT;         // atualizar o estado do grupo para WAIT
@@ -315,7 +319,11 @@ static void receivePayment (int n)
     }
 
     // TODO insert your code here
-    
+
+    // atualizar e salvar o estado
+    sh->fSt.st.receptionistStat = RECVPAY;
+    saveState(nFic, &sh->fSt);
+
     // atualizar estado do grupo
     groupRecord[n] = DONE;
 
