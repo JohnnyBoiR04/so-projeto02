@@ -51,6 +51,8 @@ static SHARED_DATA *sh;
 /** \brief receptioninst view on each group evolution (useful to decide table binding) */
 static int groupRecord[MAXGROUPS];
 
+// estrutura de dados para guardar o estado das mesas
+int tableStatus[NUMTABLES];
 
 /** \brief receptionist waits for next request */
 static request waitForGroup ();
@@ -72,6 +74,11 @@ int main (int argc, char *argv[])
 {
     int key;                                            /*access key to shared memory and semaphore set */
     char *tinp;                                                       /* numerical parameters test flag */
+
+    // inicializar o estado das mesas
+    for (int i = 0; i < NUMTABLES; i++) {
+    tableStatus[i] = 0;                                 // 0 indica mesa livre
+    }
 
     /* validation of command line parameters */
     if (argc != 4) { 
@@ -149,9 +156,17 @@ int main (int argc, char *argv[])
  */
 static int decideTableOrWait(int n)
 {
-     //TODO insert your code here
+    //TODO insert your code here
 
-     return -1;
+    // verificar a disponibilidade de mesas
+    for (int i = 0; i < 2; i++) {
+        if (tableStatus[i] == 0) {  // se houver mesas disponiveis
+            return i;               // retorna o id da mesa
+        }
+    }
+
+    // nenhuma mesa disponivel, o grupo deve esperar
+    return -1;
 }
 
 /**
@@ -164,9 +179,17 @@ static int decideTableOrWait(int n)
  */
 static int decideNextGroup()
 {
-     //TODO insert your code here
+    //TODO insert your code here
 
-     return -1;
+    // verificar se há grupos a espera
+    for (int i = 0; i < sh->fSt.nGroups; i++) {
+        if (groupRecord[i] == WAIT) {   // se houver grupos a espera
+            return i;                   // retorna o id do grupo
+        }
+    }
+
+    // não há grupos a espera
+    return -1;
 }
 
 /**
@@ -182,33 +205,57 @@ static request waitForGroup()
 {
     request ret; 
 
+    int groupId = -1;
+
     if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
     // TODO insert your code here
-    
+
+    // aguardar a chegada de um grupo ou um pedido de pagamento
+    while (true) {
+        bool found = false;
+        for (int i = 0; i < sh->fSt.nGroups; i++) {
+            if (groupRecord[i] == TOARRIVE || groupRecord[i] == DONE) {
+                groupId = i;
+                groupRecord[i] = (groupRecord[i] == TOARRIVE) ? WAIT : DONE;
+                found = true;
+                break;
+            }
+        }
+
+        if (found) {
+            break;
+        }
+
+        // sair da região crítica enquanto espera
+        if (semUp(semgid, sh->mutex) == -1) {
+            perror("Erro na operação up do semáforo (RT)");
+            exit(EXIT_FAILURE);
+        }
+
+        // aguardar ativamente por um curto período
+        usleep(1000); // espera ativa por 1 milissegundo
+
+        // reentrar na região crítica
+        if (semDown(semgid, sh->mutex) == -1) {
+            perror("Erro na operação down do semáforo (RT)");
+            exit(EXIT_FAILURE);
+        }
+
+
+    }
+
+    // atualizar o estado do grupo, se necessário
+    if (groupRecord[groupId] == TOARRIVE) {
+        groupRecord[groupId] = WAIT;
+    }
     if (semUp (semgid, sh->mutex) == -1)      {                                             /* exit critical region */
         perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
-
-    // TODO insert your code here
-
-    if (semDown (semgid, sh->mutex) == -1)  {                                                  /* enter critical region */
-        perror ("error on the up operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    // TODO insert your code here
-
-    if (semUp (semgid, sh->mutex) == -1) {                                                  /* exit critical region */
-     perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    // TODO insert your code here
 
     return ret;
 
@@ -231,6 +278,17 @@ static void provideTableOrWaitingRoom (int n)
     }
 
     // TODO insert your code here
+
+    int tableId = decideTableOrWait(n);
+
+    if (tableId != -1) {
+        // mesa disponível, atribuir mesa ao grupo
+        tableStatus[tableId] = 1;      // Mmrcar a mesa como ocupada
+        groupRecord[n] = ATTABLE;      // atualizar o estado do grupo para ATTABLE
+    } else {
+        // nenhuma mesa disponível, o grupo deve esperar
+        groupRecord[n] = WAIT;         // atualizar o estado do grupo para WAIT
+    }
 
     if (semUp (semgid, sh->mutex) == -1) {                                               /* exit critical region */
         perror ("error on the down operation for semaphore access (WT)");
@@ -257,6 +315,28 @@ static void receivePayment (int n)
     }
 
     // TODO insert your code here
+    
+    // atualizar estado do grupo
+    groupRecord[n] = DONE;
+
+    for (int i = 0; i < NUMTABLES; i++) {
+        if (tableStatus[i] == n) {              // encontrar a mesa ocupada pelo grupo
+            tableStatus[i] = 0;                 // marcar mesa como livre
+            break;
+        }
+    }
+
+    // verificar se há grupos à espera e mesas disponíveis
+    for (int i = 0; i < sh->fSt.nGroups; i++) {
+        if (groupRecord[i] == WAIT) {
+            int tableId = decideTableOrWait(i);
+            if (tableId != -1) {
+                tableStatus[tableId] = 1; // ocupar mesa
+                groupRecord[i] = ATTABLE; // atualizar estado do próximo grupo
+                break; // somente um grupo pode ocupar a mesa que se tornou disponível
+            }
+        }
+    }
 
     if (semUp (semgid, sh->mutex) == -1)  {                                                  /* exit critical region */
      perror ("error on the down operation for semaphore access (WT)");
