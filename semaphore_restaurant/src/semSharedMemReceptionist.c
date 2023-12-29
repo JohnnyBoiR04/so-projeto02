@@ -218,7 +218,7 @@ static request waitForGroup()
             if (groupRecord[i] == FOOD_REQUEST || groupRecord[i] == DONE) {
                 // Group is either waiting to make a request or ready to pay
                 int groupId = i; // Assuming req.groupId is used to store the group's ID
-                req.reqType = (groupRecord[i] == FOOD_REQUEST) ? TABLEREQ : BILLREQ;
+                ret.reqType = (groupRecord[i] == FOOD_REQUEST) ? TABLEREQ : BILLREQ;
                 groupFound = true;
                 break;
             }
