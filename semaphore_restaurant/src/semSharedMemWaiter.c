@@ -142,7 +142,7 @@ static request waitForClientOrChef()
 
     sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do garçom */
     // Salvar o estado atual
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Espera por um pedido de cliente ou chef
     if (semDown (semgid, sh->waiterRequest) == -1) {                                            /* aguarda pedido */
@@ -188,7 +188,7 @@ static void informChef(int group)
     sh->fSt.st.waiterStat = INFORM_CHEF; // Supondo que waiterStat é um campo do estado compartilhado
 
     // Salvar o estado atual
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Definir o pedido e o grupo que fez o pedido
     sh->fSt.waiterRequest.reqType = FOODREQ;
@@ -237,7 +237,7 @@ static void takeFoodToTable(int group)
     sh->fSt.st.waiterStat = TAKE_TO_TABLE;
 
     // Salvar o estado atual
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Supondo que o grupo é identificado pelo índice da mesa que ocupa
     int tableId = sh->fSt.assignedTable[group];

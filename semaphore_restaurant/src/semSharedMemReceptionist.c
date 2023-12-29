@@ -208,6 +208,7 @@ static int decideNextGroup()
 static request waitForGroup()
 {
     request req;
+    
     // Entrar na região crítica
     if (semDown(semgid, sh->mutex) == -1) {
         perror("error on the down operation for semaphore access");
@@ -216,7 +217,7 @@ static request waitForGroup()
 
     // Inicializar o status do recepcionista
     sh->fSt.st.receptionistStat = 0;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Sair da região crítica
     if (semUp(semgid, sh->mutex) == -1) {
@@ -277,7 +278,7 @@ static void provideTableOrWaitingRoom (int n)
 
     // Atualizar o status do recepcionista para ASSIGNTABLE
     sh->fSt.st.receptionistStat = 1;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     if (tableId < 0) {
         // Nenhuma mesa disponível, o grupo deve esperar
@@ -323,7 +324,7 @@ static void receivePayment (int n)
 
     // Atualizar o status do recepcionista para RECVPAY
     sh->fSt.st.receptionistStat = 2;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Marcar que o grupo completou sua refeição
     groupRecord[n] = DONE;

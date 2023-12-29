@@ -202,7 +202,7 @@ static void checkInAtReception(int id) {
 
     // Update group state to ATRECEPTION
     sh->fSt.st.groupStat[id] = ATRECEPTION;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Indicate new check-in request
     sh->fSt.receptionistRequest.reqType = TABLEREQ;
@@ -252,7 +252,7 @@ static void orderFood(int id) {
 
     // Update group state to FOOD_REQUEST
     sh->fSt.st.groupStat[id] = FOOD_REQUEST;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Prepare and send food request to waiter
     sh->fSt.waiterRequest.reqType = FOODREQ;
@@ -294,7 +294,7 @@ static void waitFood(int id) {
 
     // Update group state to WAIT_FOR_FOOD
     sh->fSt.st.groupStat[id] = WAIT_FOR_FOOD;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Get the table ID assigned to the group
     int tableId = sh->fSt.assignedTable[id];
@@ -319,7 +319,7 @@ static void waitFood(int id) {
 
     // Update group state to EAT
     sh->fSt.st.groupStat[id] = EAT;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Exit critical region
     if (semUp(semgid, sh->mutex) == -1) {
@@ -355,7 +355,7 @@ static void checkOutAtReception(int id) {
 
     // Update group state to CHECKOUT
     sh->fSt.st.groupStat[id] = CHECKOUT;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Indicate that the group wants to pay
     sh->fSt.receptionistRequest.reqType = BILLREQ;
@@ -387,7 +387,7 @@ static void checkOutAtReception(int id) {
 
     // Update group state to LEAVING
     sh->fSt.st.groupStat[id] = LEAVING;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Exit critical region
     if (semUp(semgid, sh->mutex) == -1) {

@@ -143,7 +143,7 @@ static void waitForOrder ()
 
     // Update the chef's state to WAIT_FOR_ORDER
     sh->fSt.st.chefStat = WAIT_FOR_ORDER;
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Exit critical region
     if (semUp(semgid, sh->mutex) == -1) {
@@ -184,7 +184,7 @@ static void processOrder ()
 
     // Update the chef's state to REST
     sh->fSt.st.chefStat = REST;  // Assuming REST represents the chef's resting state
-    saveState(nFic, sh);
+    saveState(nFic, &sh->fSt);
 
     // Exit critical region
     if (semUp(semgid, sh->mutex) == -1) {
