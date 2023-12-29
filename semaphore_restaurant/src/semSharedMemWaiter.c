@@ -140,18 +140,22 @@ static request waitForClientOrChef()
         exit (EXIT_FAILURE);
     }
 
+    sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do garçom */
+    saveState(nFic, &sh->fSt); 
+
+    if (semUp (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
+        perror ("error on the down operation for semaphore access (WT)");
+        exit (EXIT_FAILURE);
+    }
+
     // Espera por um pedido de cliente ou chef
     if (semDown (semgid, sh->waiterRequest) == -1) {                                            /* aguarda pedido */
         perror ("error on the down operation for semaphore waitingRequest (WT)");
         exit (EXIT_FAILURE);
     }
 
-    sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do garçom */
-    saveState(nFic, &sh->fSt);                                                                  /* salva estado interno */
-
-    // Signal that new requests are possible
-    if (semUp (semgid, sh->waiterRequestPossible) == -1) {
-        perror ("error on the up operation for semaphore waitingRequest (WT)");
+    if (semDown (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
+        perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
 
@@ -161,6 +165,12 @@ static request waitForClientOrChef()
     if (semUp (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
         perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
+    }
+    
+    // Liberando o semáforo que permite novos pedidos
+    if (semUp(semgid, sh->waiterRequestPossible) == -1) {
+        perror("error on the up operation for requestAvailable semaphore");
+        exit(EXIT_FAILURE);
     }
 
     return req;
@@ -182,30 +192,32 @@ static void informChef(int group)
         exit (EXIT_FAILURE);
     }
 
-    if (semUp (semgid, sh->waiterRequest) == -1) {                                            
-        perror ("error on the down operation for semaphore waitingRequest (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    sh->fSt.st.waiterStat = INFORM_CHEF;                                                      /* atualiza estado do garçom */
-    saveState(nFic, &sh->fSt);                                                                /* salva estado interno */
-
-    // Waiter takes food request to chef
-    if (semDown (semgid, sh->orderReceived) == -1) {
-        perror ("error on the up operation for semaphore chefNotified (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    // Client is informed that request is received
-    if (semUp (semgid, sh->requestReceived[group]) == -1) {
-        perror ("error on the up operation for semaphore requestReceived (WT)");
-        exit (EXIT_FAILURE);
-    }
-
+    // Mudança de estado e salvar o estado
+    sh->fSt.st.waiterStat = INFORM_CHEF; // Supondo que waiterStat é um campo do estado compartilhado
+    sh->fSt.reqGroup = n;                // Atribuir o grupo para o qual o pedido será feito
+    saveState(&nFic, sh);
 
     if (semUp (semgid, sh->mutex) == -1) {                                                    /* sai da região crítica */
         perror ("error on the down operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
+    }
+
+    // Sinalizando ao chef que um pedido foi feito
+    if (semUp(semgid, sh->chefNotified) == -1) {
+        perror("error on the up operation for chefNotified semaphore");
+        exit(EXIT_FAILURE);
+    }
+
+    // Esperando que o chef receba o pedido
+    if (semDown(semgid, sh->chefReceived) == -1) {
+        perror("error on the down operation for chefReceived semaphore");
+        exit(EXIT_FAILURE);
+    }
+
+    // Liberando o semáforo que permite novos pedidos
+    if (semUp(semgid, sh->requestAvailable) == -1) {
+        perror("error on the up operation for requestAvailable semaphore");
+        exit(EXIT_FAILURE);
     }
 }
 
