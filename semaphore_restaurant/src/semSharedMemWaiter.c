@@ -141,7 +141,8 @@ static request waitForClientOrChef()
     }
 
     sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do garçom */
-    saveState(nFic, &sh->fSt); 
+    // Salvar o estado atual
+    saveState(nFic, sh);
 
     if (semUp (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
         perror ("error on the down operation for semaphore access (WT)");
@@ -154,22 +155,12 @@ static request waitForClientOrChef()
         exit (EXIT_FAILURE);
     }
 
-    if (semDown (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
+    // Ler o pedido do cliente ou chef
+    req = sh->fSt.waiterRequest;
 
-    // Lê o pedido da memória compartilhada
-    req = sh->fSt.waiterRequest;                                                                
-
-    if (semUp (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
-    
-    // Liberando o semáforo que permite novos pedidos
+    // Sinalizar que novos pedidos podem ser feitos
     if (semUp(semgid, sh->waiterRequestPossible) == -1) {
-        perror("error on the up operation for requestAvailable semaphore");
+        perror("error on the up operation for semaphore access (waiterRequestPossible)");
         exit(EXIT_FAILURE);
     }
 
@@ -194,29 +185,29 @@ static void informChef(int group)
 
     // Mudança de estado e salvar o estado
     sh->fSt.st.waiterStat = INFORM_CHEF; // Supondo que waiterStat é um campo do estado compartilhado
-    sh->fSt.reqGroup = n;                // Atribuir o grupo para o qual o pedido será feito
-    saveState(&nFic, sh);
 
-    if (semUp (semgid, sh->mutex) == -1) {                                                    /* sai da região crítica */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
+    // Salvar o estado atual
+    saveState(nFic, sh);
 
-    // Sinalizando ao chef que um pedido foi feito
-    if (semUp(semgid, sh->chefNotified) == -1) {
-        perror("error on the up operation for chefNotified semaphore");
+    // Definir o pedido e o grupo que fez o pedido
+    sh->fSt.waiterRequest.reqType = FOODREQ;
+    sh->fSt.waiterRequest.reqGroup = group;
+
+    // Sinalizar que um pedido foi feito ao chef
+    if (semUp(semgid, sh->waiterRequest) == -1) {
+        perror("error on the up operation for semaphore access (waiterRequest)");
         exit(EXIT_FAILURE);
     }
 
-    // Esperando que o chef receba o pedido
-    if (semDown(semgid, sh->chefReceived) == -1) {
-        perror("error on the down operation for chefReceived semaphore");
+    // Esperar que o chef reconheça o pedido
+    if (semDown(semgid, sh->orderReceived) == -1) {
+        perror("error on the down operation for semaphore access (orderReceived)");
         exit(EXIT_FAILURE);
     }
 
-    // Liberando o semáforo que permite novos pedidos
-    if (semUp(semgid, sh->requestAvailable) == -1) {
-        perror("error on the up operation for requestAvailable semaphore");
+    // Sair da região crítica (mutex)
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (mutex)");
         exit(EXIT_FAILURE);
     }
 }
@@ -236,22 +227,24 @@ static void takeFoodToTable(int group)
         exit (EXIT_FAILURE);
     }
 
-    if (semUp (semgid, sh->waiterRequest) == -1) {                                            
-        perror ("error on the down operation for semaphore waitingRequest (WT)");
-        exit (EXIT_FAILURE);
+    // Atualizar o estado do garçom para TAKE_TO_TABLE
+    sh->fSt.st.waiterStat = TAKE_TO_TABLE;
+
+    // Salvar o estado atual
+    saveState(nFic, sh);
+
+    // Supondo que o grupo é identificado pelo índice da mesa que ocupa
+    int tableId = sh->fSt.assignedTable[group];
+
+    // Sinalizar que a comida está pronta para ser servida na mesa
+    if (semUp(semgid, sh->foodArrived[tableId]) == -1) {
+        perror("error on the up operation for semaphore access (foodArrived)");
+        exit(EXIT_FAILURE);
     }
 
-    sh->fSt.st.waiterStat = TAKE_TO_TABLE;                                                    /* atualiza estado do garçom */
-    saveState(nFic, &sh->fSt);                                                                /* salva estado interno */
-
-    // Inform group that food is available
-    if (semUp (semgid, sh->foodArrived[group]) == -1) {
-        perror ("error on the up operation for semaphore foodReady (WT)");
-        exit (EXIT_FAILURE);
-    }
-
-    if (semUp (semgid, sh->mutex) == -1) {                                                    /* sai da região crítica */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
+    // Sair da região crítica (mutex)
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (mutex)");
+        exit(EXIT_FAILURE);
     }
 }
