@@ -144,11 +144,6 @@ static request waitForClientOrChef()
     // Salvar o estado atual
     saveState(nFic, sh);
 
-    if (semUp (semgid, sh->mutex) == -1) {                                                      /* sai da região crítica */
-        perror ("error on the down operation for semaphore access (WT)");
-        exit (EXIT_FAILURE);
-    }
-
     // Espera por um pedido de cliente ou chef
     if (semDown (semgid, sh->waiterRequest) == -1) {                                            /* aguarda pedido */
         perror ("error on the down operation for semaphore waitingRequest (WT)");
@@ -161,6 +156,12 @@ static request waitForClientOrChef()
     // Sinalizar que novos pedidos podem ser feitos
     if (semUp(semgid, sh->waiterRequestPossible) == -1) {
         perror("error on the up operation for semaphore access (waiterRequestPossible)");
+        exit(EXIT_FAILURE);
+    }
+
+    // Exit critical region
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (WT)");
         exit(EXIT_FAILURE);
     }
 
@@ -205,6 +206,11 @@ static void informChef(int group)
         exit(EXIT_FAILURE);
     }
 
+    if (semUp(semgid, sh->waiterRequestPossible) == -1) {
+        perror("error on the up operation for semaphore access (WT)");
+        exit(EXIT_FAILURE);
+    }
+    
     // Sair da região crítica (mutex)
     if (semUp(semgid, sh->mutex) == -1) {
         perror("error on the up operation for semaphore access (mutex)");

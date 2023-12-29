@@ -125,29 +125,36 @@ int main (int argc, char *argv[])
  */
 static void waitForOrder ()
 {
-    if (semDown (semgid, sh->mutex) == -1) {                                                          /* enter critical region */
-        perror ("error on the down operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Wait for the waiter to signal that an order is ready to be processed
+    if (semDown(semgid, sh->waitOrder) == -1) {
+        perror("error on the down operation for waiter order semaphore (CH)");
+        exit(EXIT_FAILURE);
     }
 
-    if (semDown (semgid, sh->waitOrder) == -1) {                                                     /* enter critical region */
-        perror ("error on the down operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Enter critical region
+    if (semDown(semgid, sh->mutex) == -1) {
+        perror("error on the down operation for semaphore access (CH)");
+        exit(EXIT_FAILURE);
     }
 
-    // update do estado do chef 
+    // Update the last group and reset the order received flag
+    lastGroup = sh->fSt.waiterRequest.reqGroup;
+    sh->fSt.waiterRequest.reqType = 0;  // Assuming 0 represents no request
+
+    // Update the chef's state to WAIT_FOR_ORDER
     sh->fSt.st.chefStat = WAIT_FOR_ORDER;
     saveState(nFic, sh);
 
-    // pedido recebido
-    if (semUp (semgid, sh->orderReceived) == -1) {                                                  
-        perror ("error on the up operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Exit critical region
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (CH)");
+        exit(EXIT_FAILURE);
     }
 
-    if (semUp (semgid, sh->mutex) == -1) {                                                          /* exit critical region */
-        perror ("error on the up operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Signal the waiter that the order has been received and is being processed
+    if (semUp(semgid, sh->orderReceived) == -1) {
+        perror("error on the up operation for order received semaphore (CH)");
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -161,28 +168,33 @@ static void waitForOrder ()
  */
 static void processOrder ()
 {
-    // simulaçao do tempo de cozinhar
-    usleep((unsigned int) (100.0 + (random() % MAXCOOK)));
+    // Simulate cooking time
+    int cookTime = (random() % MAXCOOK) + 100;  // Assuming MAXCOOK is defined
+    usleep(cookTime * 1000);  // usleep takes microseconds
 
-    // sinal que a comida está pronta
-    if (semDown (semgid, sh->mutex) == -1) {
-        perror ("error on the up operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Enter critical region
+    if (semDown(semgid, sh->mutex) == -1) {
+        perror("error on the down operation for semaphore access (CH)");
+        exit(EXIT_FAILURE);
     }
 
-    // Update the chef's state
-    sh->fSt.st.chefStat = COOK;
+    // Update the order to indicate it's ready
+    sh->fSt.waiterRequest.reqType = FOODREADY;  // Assuming FOODREADY represents ready order
+    sh->fSt.waiterRequest.reqGroup = lastGroup;
+
+    // Update the chef's state to REST
+    sh->fSt.st.chefStat = REST;  // Assuming REST represents the chef's resting state
     saveState(nFic, sh);
 
-    // sinal que a comida está pronta
-    if (semDown (semgid, sh->waiterRequestPossible) == -1) {
-        perror ("error on the up operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Exit critical region
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (CH)");
+        exit(EXIT_FAILURE);
     }
 
-    // sair da regiao critica
-    if (semUp (semgid, sh->mutex) == -1) {
-        perror ("error on the up operation for semaphore access (CH)");
-        exit (EXIT_FAILURE);
+    // Notify the waiter that the food is ready
+    if (semUp(semgid, sh->waiterRequest) == -1) {
+        perror("error on the up operation for waiter request semaphore (CH)");
+        exit(EXIT_FAILURE);
     }
 }
