@@ -201,7 +201,7 @@ static int decideNextGroup()
  */
 static request waitForGroup()
 {
-    request ret; 
+    request req; 
 
     bool groupFound = false;
 
@@ -218,7 +218,7 @@ static request waitForGroup()
             if (groupRecord[i] == FOOD_REQUEST || groupRecord[i] == DONE) {
                 // Group is either waiting to make a request or ready to pay
                 int groupId = i; // Assuming req.groupId is used to store the group's ID
-                ret.reqType = (groupRecord[i] == FOOD_REQUEST) ? TABLEREQ : BILLREQ;
+                req.reqType = (groupRecord[i] == FOOD_REQUEST) ? TABLEREQ : BILLREQ;
                 groupFound = true;
                 break;
             }
@@ -247,7 +247,7 @@ static request waitForGroup()
         exit (EXIT_FAILURE);
     }
 
-    return ret;
+    return req;
 
 }
 
