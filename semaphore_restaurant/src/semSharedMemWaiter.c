@@ -140,7 +140,7 @@ static request waitForClientOrChef()
         exit (EXIT_FAILURE);
     }
 
-    sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do garçom */
+    sh->fSt.st.waiterStat = WAIT_FOR_REQUEST;                                                   /* atualiza estado do empregado de mesa */
     saveState(nFic, &sh->fSt);
 
     if (semUp(semgid, sh->mutex) == -1) {                                                       /* sai da região crítica */
@@ -148,7 +148,6 @@ static request waitForClientOrChef()
         exit(EXIT_FAILURE);
     }
 
-    // Espera por um pedido de cliente ou chef
     if (semDown (semgid, sh->waiterRequest) == -1) {                                            /* aguarda pedido */
         perror ("error on the down operation for semaphore waitingRequest (WT)");
         exit (EXIT_FAILURE);
@@ -163,13 +162,13 @@ static request waitForClientOrChef()
     req.reqGroup = sh->fSt.waiterRequest.reqGroup;
     req.reqType = sh->fSt.waiterRequest.reqType;
 
-    // Exit critical region
-    if (semUp(semgid, sh->mutex) == -1) {
+    
+    if (semUp(semgid, sh->mutex) == -1) {                                                       /* sai da região crítica */
         perror("error on the up operation for semaphore access (WT)");
         exit(EXIT_FAILURE);
     }
 
-    if (semUp(semgid, sh->waiterRequestPossible) == -1) {                                       /* sinaliza que um pedido pode ser feito */
+    if (semUp(semgid, sh->waiterRequestPossible) == -1) {                                       /* sinaliza que o pedido foi recebido */
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
@@ -188,6 +187,7 @@ static request waitForClientOrChef()
  */
 static void informChef(int group)
 {
+    // Criar variável para guardar o id da mesa
     int tableId;
 
     if (semDown (semgid, sh->mutex) == -1) {                                                  /* entra na região crítica */
@@ -208,10 +208,10 @@ static void informChef(int group)
         exit (EXIT_FAILURE);
     }
 
+    // Usar o grupo para obter o id da mesa
     tableId = sh->fSt.assignedTable[group];
 
-    // Sair da região crítica (mutex)
-    if (semUp(semgid, sh->mutex) == -1) {
+    if (semUp(semgid, sh->mutex) == -1) {                                                       /* sai da região crítica */
         perror("error on the up operation for semaphore access (mutex)");
         exit(EXIT_FAILURE);
     }
@@ -222,7 +222,7 @@ static void informChef(int group)
         exit(EXIT_FAILURE);
     }
 
-    if (semUp(semgid, sh->requestReceived[tableId]) == -1) {                                     /* sinaliza que o pedido foi recebido */
+    if (semUp(semgid, sh->requestReceived[tableId]) == -1) {                                     /* sinaliza que o pedido foi recebido pelo cozinheiro */
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
     }
@@ -253,8 +253,7 @@ static void takeFoodToTable(int group)
         exit(EXIT_FAILURE);
     }
 
-    // Sair da região crítica (mutex)
-    if (semUp(semgid, sh->mutex) == -1) {
+    if (semUp(semgid, sh->mutex) == -1) {                                                   /* sai da região crítica */
         perror("error on the up operation for semaphore access (mutex)");
         exit(EXIT_FAILURE);
     }

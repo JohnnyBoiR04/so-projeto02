@@ -266,6 +266,7 @@ static void orderFood(int id) {
         exit(EXIT_FAILURE);
     }
 
+    // Use the group id to know which table was assigned to the group  
     tableID = sh->fSt.assignedTable[id];
 
     // Exit critical region
@@ -303,6 +304,7 @@ static void waitFood(int id) {
     sh->fSt.st.groupStat[id] = WAIT_FOR_FOOD;
     saveState(nFic, &sh->fSt);
 
+    // Use the group id to know which table was assigned to the group
     tableID = sh->fSt.assignedTable[id];
 
     // Exit critical region
@@ -375,6 +377,7 @@ static void checkOutAtReception(int id) {
         exit(EXIT_FAILURE);
     }
 
+    // Use the group id to know which table was assigned to the group
     tableID = sh->fSt.assignedTable[id];
 
     // Exit critical region

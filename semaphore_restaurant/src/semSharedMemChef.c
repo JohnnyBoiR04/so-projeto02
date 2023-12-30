@@ -141,7 +141,7 @@ static void waitForOrder ()
     lastGroup = sh->fSt.foodGroup;
 
     // Update the chef's state to COOK
-    sh->fSt.st.chefStat = COOK;  // Assuming COOK represents the chef's cooking state
+    sh->fSt.st.chefStat = COOK;
     saveState(nFic, &sh->fSt);
 
     // Signal the waiter that the order has been received and is being processed
@@ -184,7 +184,7 @@ static void processOrder ()
     }
 
     // Update the order to indicate it's ready
-    sh->fSt.waiterRequest.reqType = FOODREADY;  // Assuming FOODREADY represents ready order
+    sh->fSt.waiterRequest.reqType = FOODREADY;
     sh->fSt.waiterRequest.reqGroup = lastGroup;
 
     // Notify the waiter that the food is ready
