@@ -51,7 +51,6 @@ static SHARED_DATA *sh;
 /** \brief receptioninst view on each group evolution (useful to decide table binding) */
 static int groupRecord[MAXGROUPS];
 
-
 /** \brief receptionist waits for next request */
 static request waitForGroup ();
 
@@ -216,7 +215,7 @@ static request waitForGroup()
     }
 
     // Inicializar o status do recepcionista
-    sh->fSt.st.receptionistStat = 0;
+    sh->fSt.st.receptionistStat = WAIT_FOR_REQUEST;
     saveState(nFic, &sh->fSt);
 
     // Sair da região crítica
@@ -238,16 +237,17 @@ static request waitForGroup()
     }
 
     // Obter o tipo de solicitação
-    int requestType = req.reqType;
+    req.reqGroup = sh->fSt.receptionistRequest.reqGroup;
+    req.reqType = sh->fSt.receptionistRequest.reqType;
 
-    // Sair da região crítica
-    if (semUp(semgid, sh->mutex) == -1) {
+    // Sinalizar que está pronto para receber outra solicitação
+    if (semUp(semgid, sh->receptionistRequestPossible) == -1) {
         perror("error on the up operation for semaphore access");
         exit(EXIT_FAILURE);
     }
 
-    // Sinalizar que está pronto para receber outra solicitação
-    if (semUp(semgid, sh->receptionistRequestPossible) == -1) {
+    // Sair da região crítica
+    if (semUp(semgid, sh->mutex) == -1) {
         perror("error on the up operation for semaphore access");
         exit(EXIT_FAILURE);
     }
@@ -274,11 +274,11 @@ static void provideTableOrWaitingRoom (int n)
 
     // TODO insert your code here
 
-    int tableId = decideTableOrWait(n);
-
     // Atualizar o status do recepcionista para ASSIGNTABLE
-    sh->fSt.st.receptionistStat = 1;
+    sh->fSt.st.receptionistStat = ASSIGNTABLE;
     saveState(nFic, &sh->fSt);
+
+    int tableId = decideTableOrWait(n);
 
     if (tableId < 0) {
         // Nenhuma mesa disponível, o grupo deve esperar
@@ -321,13 +321,19 @@ static void receivePayment (int n)
     }
 
     // TODO insert your code here
-
     // Atualizar o status do recepcionista para RECVPAY
-    sh->fSt.st.receptionistStat = 2;
+    sh->fSt.st.receptionistStat = RECVPAY;
     saveState(nFic, &sh->fSt);
+
+    // Marcar que o grupo abandonou a mesa
+    if (semUp(semgid, sh->tableDone[sh->fSt.assignedTable[n]]) == -1) {
+        perror("error on the up operation for semaphore access");
+        exit(EXIT_FAILURE);
+    }
 
     // Marcar que o grupo completou sua refeição
     groupRecord[n] = DONE;
+    sh->fSt.assignedTable[n] = -1;
 
     // Se houver grupos esperando, decidir qual grupo vai ocupar a mesa que ficou vazia
     int nextGroup = -1;
@@ -340,9 +346,6 @@ static void receivePayment (int n)
             groupRecord[nextGroup] = ATTABLE;
         }
     }
-    
-    // Liberar a mesa ocupada pelo grupo que está saindo
-    sh->fSt.assignedTable[n] = -1;
     
     if (semUp (semgid, sh->mutex) == -1)  {                                                  /* exit critical region */
      perror ("error on the down operation for semaphore access (WT)");

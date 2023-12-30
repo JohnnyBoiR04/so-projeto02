@@ -138,22 +138,21 @@ static void waitForOrder ()
     }
 
     // Update the last group and reset the order received flag
-    lastGroup = sh->fSt.waiterRequest.reqGroup;
-    sh->fSt.waiterRequest.reqType = 0;  // Assuming 0 represents no request
+    lastGroup = sh->fSt.foodGroup;
 
-    // Update the chef's state to WAIT_FOR_ORDER
-    sh->fSt.st.chefStat = WAIT_FOR_ORDER;
+    // Update the chef's state to COOK
+    sh->fSt.st.chefStat = COOK;  // Assuming COOK represents the chef's cooking state
     saveState(nFic, &sh->fSt);
-
-    // Exit critical region
-    if (semUp(semgid, sh->mutex) == -1) {
-        perror("error on the up operation for semaphore access (CH)");
-        exit(EXIT_FAILURE);
-    }
 
     // Signal the waiter that the order has been received and is being processed
     if (semUp(semgid, sh->orderReceived) == -1) {
         perror("error on the up operation for order received semaphore (CH)");
+        exit(EXIT_FAILURE);
+    }
+
+    // Exit critical region
+    if (semUp(semgid, sh->mutex) == -1) {
+        perror("error on the up operation for semaphore access (CH)");
         exit(EXIT_FAILURE);
     }
 }
@@ -167,10 +166,16 @@ static void waitForOrder ()
  *  The internal state should be saved.
  */
 static void processOrder ()
-{
+{   
     // Simulate cooking time
     int cookTime = (random() % MAXCOOK) + 100;  // Assuming MAXCOOK is defined
     usleep(cookTime * 1000);  // usleep takes microseconds
+
+    // Wait for the waiter to be available to receive the food
+    if (semDown(semgid, sh->waiterRequestPossible) == -1) {
+        perror("error on the down operation for waiter request semaphore (CH)");
+        exit(EXIT_FAILURE);
+    }
 
     // Enter critical region
     if (semDown(semgid, sh->mutex) == -1) {
@@ -182,19 +187,19 @@ static void processOrder ()
     sh->fSt.waiterRequest.reqType = FOODREADY;  // Assuming FOODREADY represents ready order
     sh->fSt.waiterRequest.reqGroup = lastGroup;
 
-    // Update the chef's state to REST
-    sh->fSt.st.chefStat = REST;  // Assuming REST represents the chef's resting state
+    // Notify the waiter that the food is ready
+    if (semUp(semgid, sh->waiterRequest) == -1) {
+        perror("error on the up operation for waiter request semaphore (CH)");
+        exit(EXIT_FAILURE);
+    }
+
+    // Update the chef's state to WAIT_FOR_ORDER
+    sh->fSt.st.chefStat = WAIT_FOR_ORDER;
     saveState(nFic, &sh->fSt);
 
     // Exit critical region
     if (semUp(semgid, sh->mutex) == -1) {
         perror("error on the up operation for semaphore access (CH)");
-        exit(EXIT_FAILURE);
-    }
-
-    // Notify the waiter that the food is ready
-    if (semUp(semgid, sh->waiterRequest) == -1) {
-        perror("error on the up operation for waiter request semaphore (CH)");
         exit(EXIT_FAILURE);
     }
 }
