@@ -200,8 +200,8 @@ static void informChef(int group)
     saveState(nFic, &sh->fSt);
 
     // Definir o pedido e o grupo que fez o pedido
-    sh->fSt.waiterRequest.reqType = FOODREQ;
-    sh->fSt.waiterRequest.reqGroup = group;
+    sh->fSt.foodGroup = group;
+    sh->fSt.foodOrder = 1;
 
     if (semUp(semgid, sh->waitOrder) == -1) {                                                  /* sinaliza que o pedido foi feito */
         perror ("error on the up operation for semaphore access (WT)");
@@ -238,8 +238,6 @@ static void informChef(int group)
  */
 static void takeFoodToTable(int group)
 {
-    int tableId;
-
     if (semDown (semgid, sh->mutex) == -1) {                                                  /* entra na região crítica */
         perror ("error on the up operation for semaphore access (WT)");
         exit (EXIT_FAILURE);
@@ -249,10 +247,8 @@ static void takeFoodToTable(int group)
     sh->fSt.st.waiterStat = TAKE_TO_TABLE;
     saveState(nFic, &sh->fSt);
 
-    tableId = sh->fSt.assignedTable[group];
-
     // Sinalizar que a comida está pronta para ser servida na mesa
-    if (semUp(semgid, sh->foodArrived[tableId]) == -1) {
+    if (semUp(semgid, sh->foodArrived[sh->fSt.assignedTable[group]]) == -1) {
         perror("error on the up operation for semaphore access (foodArrived)");
         exit(EXIT_FAILURE);
     }
